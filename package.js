@@ -3,7 +3,7 @@ var traces = [];
 function instrument( name, fn ) {
   var start = new Date(), error;
   try {
-    return fn( arguments );
+    return fn.apply( fn, arguments );
   } catch( e ) {
     error = e;
     throw e;
