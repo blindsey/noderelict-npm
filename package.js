@@ -1,17 +1,19 @@
 var traces = [];
 
 function instrument( name, fn ) {
-  var start = new Date(), error;
-  try {
-    return fn.apply( this, arguments );
-  } catch( e ) {
-    error = e;
-    throw e;
-  } finally {
-    var end = new Date();
-    var data = { lib : name, args : arguments, time : end - start };
-    if( error ) data.error = error;
-    traces.push( data );
+  return function() {
+    var start = new Date(), error;
+    try {
+      return fn.apply( this, arguments );
+    } catch( e ) {
+      error = e;
+      throw e;
+    } finally {
+      var end = new Date();
+      var data = { lib : name, args : arguments, time : end - start };
+      if( error ) data.error = error;
+      traces.push( data );
+    }
   }
 }
 
