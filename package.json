@@ -1,6 +1,6 @@
 {
   "name": "noderelict",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Instrumentation for node",
   "main": "package.js",
   "keywords": [ "node", "instrumentation", "performance" ],
