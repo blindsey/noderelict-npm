@@ -1,0 +1,11 @@
+{
+  "name": "noderelict",
+  "version": "0.0.1",
+  "description": "Instrumentation for node",
+  "main": "package.js",
+  "keywords": [ "node", "instrumentation", "performance" ],
+  "repository" : {
+    "type" : "git",
+    "url" : "git@gitub.com:blindsey/noderelict-npm.git"
+  }
+}
