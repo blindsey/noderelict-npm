@@ -1,3 +1,7 @@
+var http = require( 'http' ),
+    querystring = require( 'querystring' );
+
+var token = '';
 var traces = [];
 
 function instrument( name, fn ) {
@@ -25,13 +29,17 @@ function instrument( name, fn ) {
   }
 }
 
+exports.token = function( _token ) {
+  token = _token;
+};
+
 exports.start = function( response ) {
   traces.splice( 0, traces.length ); // clear the traces
   if( response && response.end ) {
     var fn = response.end
     response.end = function() {
       fn.apply( this, arguments );
-      exports.finish();
+      exports.finish( request );
     }
   }
 };
@@ -55,6 +63,43 @@ exports.wrap = function( target ) {
   }
 };
 
-exports.finish = function() {
-  console.log( traces );
+exports.finish = function( request ) {
+  if( !token ) {
+    console.error( 'You must configure a token before sending data' );
+    return;
+  }
+
+  var payload = {
+    remoteAddress : request.headers['x-forwarded-for'] || request.connection.remoteAddress,
+    method : request.method,
+    url : request.url,
+    referer : request.headers['referer'],
+    userAgent : request.headers['user-agent'],
+    sessionID : request.sessionID,
+    traces : traces
+  };
+  var body = { token : token, payload : JSON.stringify( payload ) };
+
+  var client = http.createClient( 80, 'www.noderelict.com' );
+  var client_request = client.request( 'POST', '/log', {
+    'host' : 'www.noderelict.com',
+    'User-Agent' : 'NodeJS HTTP Client ' + process.version,
+    'Content-Type' : 'application/x-www-form-urlencoded'
+  });
+
+  client_request.end( querystring.stringify( body ) );
+  client_request.on( 'response', function( response ) {
+    if( response.statusCode !== '200' ) {
+      console.error( new Date() + ' noderelict unexpexted ' + response.statusCode );
+
+      var result = '';
+      response.on( 'data', function( chunk ) {
+        result += chunk;
+      });
+
+      response.on( 'end', function() {
+        console.error( new Date() + ' noderelict ' + result );
+      });
+    }
+  });
 };
