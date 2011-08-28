@@ -68,9 +68,10 @@ module.exports = function( _token ) {
   return module.exports;
 };
 
-module.exports.start = function( request, response ) {
+module.exports.start = function( request, response, next ) {
   request.__nr = { start : new Date(), traces : [] };
   response.on( 'end', function() { upload( request ) } );
+  if( next ) next();
 };
 
 module.exports.wrap = function( request, target ) {
