@@ -10,15 +10,30 @@ function instrument( name, fn ) {
       throw e;
     } finally {
       var end = new Date();
-      var data = { lib : name, args : arguments, time : end - start };
+
+      var length = arguments.length;
+      var args = new Array( length );
+      for( var i = 0; i < length; ++i ) {
+        var arg = arguments[i];
+        args[i] = typeof( arg ) === 'function' ? 'function' : arg.toString();
+      }
+      var data = { lib : name, args : args, time : end - start };
       if( error ) data.error = error;
+
       traces.push( data );
     }
   }
 }
 
-exports.start = function() {
-  traces.splice( 0, traces.length );
+exports.start = function( response ) {
+  traces.splice( 0, traces.length ); // clear the traces
+  if( response && response.end ) {
+    var fn = response.end
+    response.end = function() {
+      fn.apply( this, arguments );
+      exports.finish();
+    }
+  }
 };
 
 exports.wrap = function( target ) {
@@ -41,7 +56,5 @@ exports.wrap = function( target ) {
 };
 
 exports.finish = function() {
-  for( var i = traces.length; i >= 0; --i ) {
-    console.log( JSON.stringify( traces[ i ] ) );
-  }
+  console.log( traces );
 };
