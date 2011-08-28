@@ -2,9 +2,8 @@ var http = require( 'http' ),
     querystring = require( 'querystring' );
 
 var token = '';
-var traces = [];
 
-function instrument( name, fn ) {
+function instrument( request, name, fn ) {
   return function() {
     var start = new Date(), error;
     try {
@@ -13,62 +12,21 @@ function instrument( name, fn ) {
       error = e;
       throw e;
     } finally {
-      var end = new Date();
-
       var length = arguments.length;
       var args = new Array( length );
       for( var i = 0; i < length; ++i ) {
         var arg = arguments[i];
         args[i] = typeof( arg ) === 'function' ? 'function' : arg.toString();
       }
-      var data = { lib : name, args : args, time : end - start };
-      if( error ) data.error = error;
+      var trace = { lib : name, args : args, time : (new Date() - start) };
+      if( error ) trace.error = error;
 
-      traces.push( data );
+      request.__nr.traces.push( trace );
     }
   }
 }
 
-exports.token = function( _token ) {
-  token = _token;
-};
-
-exports.start = function( response ) {
-  traces.splice( 0, traces.length ); // clear the traces
-  if( response && response.end ) {
-    var fn = response.end
-    response.end = function() {
-      fn.apply( this, arguments );
-      exports.finish( request );
-    }
-  }
-};
-
-exports.wrap = function( target ) {
-  var type = typeof( target );
-  if( type === 'function' ) {
-    return instrument( 'anonymous', target );
-  } else if( type === 'string' ) {
-
-    var lib = require( target );
-
-    for( var key in lib ) {
-      var value = lib[ key ];
-      if( typeof( value ) === 'function' ) {
-        lib[ key ] = instrument( target, value );
-      }
-    };
-
-    return lib;
-  }
-};
-
-exports.finish = function( request ) {
-  if( !token ) {
-    console.error( 'You must configure a token before sending data' );
-    return;
-  }
-
+function upload( request ) {
   var payload = {
     remoteAddress : request.headers['x-forwarded-for'] || request.connection.remoteAddress,
     method : request.method,
@@ -76,13 +34,14 @@ exports.finish = function( request ) {
     referer : request.headers['referer'],
     userAgent : request.headers['user-agent'],
     sessionID : request.sessionID,
-    traces : traces
+    totalTime : (new Date() - request.__nr.start)
+    traces : request.__nr.traces
   };
   var body = { token : token, payload : JSON.stringify( payload ) };
 
-  var client = http.createClient( 80, 'www.noderelict.com' );
+  var client = http.createClient( 80, 'api.noderelict.com' );
   var client_request = client.request( 'POST', '/log', {
-    'host' : 'www.noderelict.com',
+    'host' : 'api.noderelict.com',
     'User-Agent' : 'NodeJS HTTP Client ' + process.version,
     'Content-Type' : 'application/x-www-form-urlencoded'
   });
@@ -90,7 +49,7 @@ exports.finish = function( request ) {
   client_request.end( querystring.stringify( body ) );
   client_request.on( 'response', function( response ) {
     if( response.statusCode !== '200' ) {
-      console.error( new Date() + ' noderelict unexpexted ' + response.statusCode );
+      console.error( new Date() + ' noderelict bad response ' + response.statusCode );
 
       var result = '';
       response.on( 'data', function( chunk ) {
@@ -102,4 +61,32 @@ exports.finish = function( request ) {
       });
     }
   });
+}
+
+module.exports = function( _token ) {
+  token = _token;
+};
+
+module.exports.start = function( request, response ) {
+  request.__nr = { start : new Date(), traces : [] };
+  response.on( 'end', function() { upload( request ) } );
+};
+
+module.exports.wrap = function( request, target ) {
+  var type = typeof( target );
+  if( type === 'function' ) {
+    return instrument( request, '<anonymous>', target );
+  } else if( type === 'string' ) {
+
+    var lib = require( target );
+
+    for( var key in lib ) {
+      var value = lib[ key ];
+      if( typeof( value ) === 'function' ) {
+        lib[ key ] = instrument( request, target, value );
+      }
+    };
+
+    return lib;
+  }
 };
