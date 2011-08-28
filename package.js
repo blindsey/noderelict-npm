@@ -65,6 +65,7 @@ function upload( request ) {
 
 module.exports = function( _token ) {
   token = _token;
+  return module.exports;
 };
 
 module.exports.start = function( request, response ) {
