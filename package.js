@@ -34,7 +34,7 @@ function upload( request ) {
     referer : request.headers['referer'],
     userAgent : request.headers['user-agent'],
     sessionID : request.sessionID,
-    totalTime : (new Date() - request.__nr.start)
+    totalTime : (new Date() - request.__nr.start),
     traces : request.__nr.traces
   };
   var body = { token : token, payload : JSON.stringify( payload ) };
@@ -70,7 +70,11 @@ module.exports = function( _token ) {
 
 module.exports.start = function( request, response, next ) {
   request.__nr = { start : new Date(), traces : [] };
-  response.on( 'end', function() { upload( request ) } );
+  var old = response.end;
+  response.end = function() {
+    old.apply( this, arguments );
+    upload( request );
+  };
   if( next ) next();
 };
 
